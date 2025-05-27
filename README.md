@@ -44,9 +44,12 @@ This server acts as a bridge between MCP clients (like AI assistants) and TheHiv
 
 ### Prerequisites
 
-- Rust 1.70 or later
 - Access to a TheHive 5 instance
 - Valid TheHive API token
+
+### Downloading Pre-compiled Binaries
+
+You can download pre-compiled binaries for various operating systems from the [GitHub Releases page](https://github.com/gbrigandi/mcp-server-thehive/releases). Download the appropriate binary for your system, make it executable, and place it in your desired location.
 
 ### Building from Source
 
@@ -267,7 +270,7 @@ RUST_LOG=debug cargo run
 5. Submit a pull request
 
 ## License
-
+ 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Related Projects
