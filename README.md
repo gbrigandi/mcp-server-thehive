@@ -273,5 +273,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Related Projects
 
 - [thehive-client-rs](https://github.com/gbrigandi/thehive-client-rs) - Rust client library for TheHive API
-- [mcp-server-cortex](https://gihub.com/gbrigandi/mcp-server-cortex) - MCP server for Cortex
-- [mcp-server-wazuh](https://gihub.com/gbrigandi/mcp-server-wazuh) - MCP server for Wazuh SIEM
+- [mcp-server-cortex](https://github.com/gbrigandi/mcp-server-cortex) - MCP server for Cortex
+- [mcp-server-wazuh](https://github.com/gbrigandi/mcp-server-wazuh) - MCP server for Wazuh SIEM
