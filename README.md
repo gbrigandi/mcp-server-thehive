@@ -1,4 +1,5 @@
 # MCP Server for TheHive
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/gbrigandi/mcp-server-thehive)](https://archestra.ai/mcp-catalog/gbrigandi__mcp-server-thehive)
 
 An MCP (Model Context Protocol) server that provides AI models and automation tools with access to TheHive incident response platform.
 
