@@ -1,6 +1,6 @@
 [package]
 name = "mcp-server-thehive"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "TheHive Incident Response Platform MCP Server"
 authors = ["Gianluca Brigandi <gbrigand@gmail.com>"]
