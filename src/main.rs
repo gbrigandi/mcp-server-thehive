@@ -48,17 +48,12 @@ use rmcp::{
 };
 use std::env;
 use std::sync::Arc;
-use thehive_client::models::{
-    input_case::{Pap as InputCasePap, Severity as InputCaseSeverity, Tlp as InputCaseTlp},
-    CaseStatusValue, InputCase,
-};
-
 mod thehive {
     pub mod client;
     pub mod error;
 }
 
-use thehive::client::TheHiveClient;
+use thehive::client::{RawCaseInput, RawObservableInput, TheHiveClient};
 
 #[derive(Parser, Debug)]
 #[command(name = "mcp-server-thehive")]
@@ -130,6 +125,28 @@ struct CreateCaseParams {
     start_date: Option<i64>,
 }
 
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct CreateCaseObservableParams {
+    #[schemars(description = "The ID of the case to add the observable to.")]
+    case_id: String,
+    #[schemars(description = "The type of observable (e.g., 'ip', 'domain', 'url', 'hash', 'mail', 'filename', 'fqdn', 'uri_path', 'user-agent', 'autonomous-system', 'other').")]
+    data_type: String,
+    #[schemars(description = "The value of the observable.")]
+    data: String,
+    #[schemars(description = "Optional message/description for the observable.")]
+    message: Option<String>,
+    #[schemars(description = "TLP (Traffic Light Protocol) level (0-4). Defaults to case TLP if not specified.")]
+    tlp: Option<i32>,
+    #[schemars(description = "PAP (Permissible Actions Protocol) level (0-3). Defaults to case PAP if not specified.")]
+    pap: Option<i32>,
+    #[schemars(description = "Whether this observable is an IOC (Indicator of Compromise). Defaults to false.")]
+    ioc: Option<bool>,
+    #[schemars(description = "Whether this observable has been sighted. Defaults to false.")]
+    sighted: Option<bool>,
+    #[schemars(description = "Tags to associate with the observable.")]
+    tags: Option<Vec<String>>,
+}
+
 #[derive(Clone)]
 struct TheHiveToolsServer {
     thehive_client: Arc<TheHiveClient>,
@@ -188,13 +205,14 @@ impl TheHiveToolsServer {
                 let mcp_content_items: Vec<Content> = alerts
                     .into_iter()
                     .map(|alert| {
-                        let id = &alert._id;
+                        let id = &alert.id;
                         let title = &alert.title;
                         let severity = alert.severity;
                         let severity_label = &alert.severity_label;
                         let status = &alert.status;
                         let source = &alert.source;
-                        let created_at = chrono::DateTime::from_timestamp(alert._created_at, 0)
+                        let created_at = alert.created_at
+                            .and_then(|ts| chrono::DateTime::from_timestamp(ts / 1000, 0))
                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                             .unwrap_or_else(|| "Unknown".to_string());
 
@@ -233,7 +251,7 @@ impl TheHiveToolsServer {
 
         match self.thehive_client.get_alert_by_id(&params.alert_id).await {
             Ok(alert) => {
-                let id = &alert._id;
+                let id = &alert.id;
                 let title = &alert.title;
                 let description = &alert.description;
                 let severity = alert.severity;
@@ -241,7 +259,8 @@ impl TheHiveToolsServer {
                 let status = &alert.status;
                 let source = &alert.source;
                 let source_ref = &alert.source_ref;
-                let created_at = chrono::DateTime::from_timestamp(alert._created_at, 0)
+                let created_at = alert.created_at
+                    .and_then(|ts| chrono::DateTime::from_timestamp(ts / 1000, 0))
                     .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
                 let tlp_label = &alert.tlp_label;
@@ -289,16 +308,17 @@ impl TheHiveToolsServer {
                 let mcp_content_items: Vec<Content> = cases
                     .into_iter()
                     .map(|case| {
-                        let id = &case._id;
+                        let id = &case.id;
                         let number = case.number;
                         let title = &case.title;
                         let severity = case.severity;
                         let severity_label = &case.severity_label;
-                        let status = format!("{:?}", case.status);
-                        let created_at = chrono::DateTime::from_timestamp(case._created_at, 0)
+                        let status = &case.status;
+                        let created_at = case.created_at
+                            .and_then(|ts| chrono::DateTime::from_timestamp(ts / 1000, 0))
                             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                             .unwrap_or_else(|| "Unknown".to_string());
-                        let assignee = case.assignee.as_ref().and_then(|a| a.as_ref()).map(|s| s.as_str()).unwrap_or("Unassigned");
+                        let assignee = case.assignee.as_deref().unwrap_or("Unassigned");
 
                         let formatted_text = format!(
                             "Case ID: {}\nCase Number: {}\nTitle: {}\nSeverity: {} ({})\nStatus: {}\nAssignee: {}\nCreated: {}",
@@ -335,22 +355,18 @@ impl TheHiveToolsServer {
 
         match self.thehive_client.get_case_by_id(&params.case_id).await {
             Ok(case) => {
-                let id = &case._id;
+                let id = &case.id;
                 let number = case.number;
                 let title = &case.title;
                 let description = &case.description;
                 let severity = case.severity;
                 let severity_label = &case.severity_label;
-                let status = format!("{:?}", case.status);
-                let created_at = chrono::DateTime::from_timestamp(case._created_at, 0)
+                let status = &case.status;
+                let created_at = case.created_at
+                    .and_then(|ts| chrono::DateTime::from_timestamp(ts / 1000, 0))
                     .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
-                let assignee = case
-                    .assignee
-                    .as_ref()
-                    .and_then(|a| a.as_ref())
-                    .map(|s| s.as_str())
-                    .unwrap_or("Unassigned");
+                let assignee = case.assignee.as_deref().unwrap_or("Unassigned");
                 let tlp_label = &case.tlp_label;
                 let pap_label = &case.pap_label;
 
@@ -388,12 +404,12 @@ impl TheHiveToolsServer {
             .await
         {
             Ok(case) => {
-                let case_id = &case._id;
+                let case_id = &case.id;
                 let case_number = case.number;
                 let title = &case.title;
                 let severity = case.severity;
                 let severity_label = &case.severity_label;
-                let status = format!("{:?}", case.status);
+                let status = &case.status;
 
                 let formatted_text = format!(
                     "Successfully promoted alert {} to case.\nCase ID: {}\nCase Number: {}\nTitle: {}\nSeverity: {} ({})\nStatus: {}",
@@ -420,87 +436,58 @@ impl TheHiveToolsServer {
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(title = %params.title, "Creating TheHive case");
 
-        // Convert params to thehive_client::models::InputCase fields
-        let severity_payload = params.severity.map(|s_val| {
-            Some(match s_val {
-                1 => InputCaseSeverity::Variant1,
-                2 => InputCaseSeverity::Variant2,
-                3 => InputCaseSeverity::Variant3,
-                4 => InputCaseSeverity::Variant4,
-                _ => {
-                    tracing::warn!("Invalid severity value {}, defaulting to Medium (2)", s_val);
-                    InputCaseSeverity::Variant2
-                }
-            })
-        });
-
-        let tlp_payload = params.tlp.map(|t_val| {
-            Some(match t_val {
-                0 => InputCaseTlp::Variant0,
-                1 => InputCaseTlp::Variant1,
-                2 => InputCaseTlp::Variant2,
-                3 => InputCaseTlp::Variant3,
-                4 => InputCaseTlp::Variant4,
-                _ => {
-                    tracing::warn!("Invalid TLP value {}, defaulting to White (0)", t_val);
-                    InputCaseTlp::Variant0
-                }
-            })
-        });
-
-        let pap_payload = params.pap.map(|p_val| {
-            Some(match p_val {
-                0 => InputCasePap::Variant0,
-                1 => InputCasePap::Variant1,
-                2 => InputCasePap::Variant2,
-                3 => InputCasePap::Variant3,
-                _ => {
-                    tracing::warn!("Invalid PAP value {}, defaulting to White (0)", p_val);
-                    InputCasePap::Variant0
-                }
-            })
-        });
-
-        let status_payload = params.status.and_then(|s_val| {
-            match s_val.as_str() {
-                // Match against exact string values expected by TheHive
-                "New" => Some(CaseStatusValue::New),
-                "InProgress" => Some(CaseStatusValue::InProgress),
-                "Indeterminate" => Some(CaseStatusValue::Indeterminate),
-                "FalsePositive" => Some(CaseStatusValue::FalsePositive),
-                "TruePositive" => Some(CaseStatusValue::TruePositive),
-                "Other" => Some(CaseStatusValue::Other),
-                "Duplicated" => Some(CaseStatusValue::Duplicated),
-                _ => {
-                    tracing::warn!("Invalid status string '{}', not setting status.", s_val);
-                    None
-                }
+        // Validate severity if provided (1-4)
+        let severity = params.severity.map(|s| {
+            if !(1..=4).contains(&s) {
+                tracing::warn!("Invalid severity value {}, defaulting to Medium (2)", s);
+                2
+            } else {
+                s
             }
         });
 
-        let case_payload = InputCase {
+        // Validate TLP if provided (0-4)
+        let tlp = params.tlp.map(|t| {
+            if !(0..=4).contains(&t) {
+                tracing::warn!("Invalid TLP value {}, defaulting to White (0)", t);
+                0
+            } else {
+                t
+            }
+        });
+
+        // Validate PAP if provided (0-3)
+        let pap = params.pap.map(|p| {
+            if !(0..=3).contains(&p) {
+                tracing::warn!("Invalid PAP value {}, defaulting to White (0)", p);
+                0
+            } else {
+                p
+            }
+        });
+
+        // Build raw case input with proper JSON serialization
+        let case_input = RawCaseInput {
             title: params.title,
             description: params.description,
-            severity: severity_payload,
-            tags: params.tags.map(Some),
-            tlp: tlp_payload,
-            pap: pap_payload,
-            status: status_payload,
-            assignee: params.assignee.map(Some),
-            case_template: params.case_template.map(Some),
-            start_date: params.start_date.map(Some),
-            ..Default::default() // Initializes other fields (endDate, flag, customFields, etc.) to None/Default
+            severity,
+            tags: params.tags,
+            tlp,
+            pap,
+            status: params.status,
+            assignee: params.assignee,
+            case_template: params.case_template,
+            start_date: params.start_date,
         };
 
-        match self.thehive_client.create_case(case_payload).await {
+        match self.thehive_client.create_case_raw(case_input).await {
             Ok(case) => {
-                // Assuming 'case' is a struct similar to the one returned by get_case_by_id
-                let case_id = &case._id;
+                let case_id = &case.id;
                 let case_number = case.number;
                 let title = &case.title;
                 let severity = case.severity;
                 let severity_label = &case.severity_label;
-                let status = format!("{:?}", case.status); // Or case.status if it's already a string
+                let status = &case.status;
 
                 let formatted_text = format!(
                     "Successfully created case.\nCase ID: {}\nCase Number: {}\nTitle: {}\nSeverity: {} ({})\nStatus: {}",
@@ -511,6 +498,60 @@ impl TheHiveToolsServer {
             }
             Err(e) => {
                 let err_msg = format!("Error creating case in TheHive: {}", e);
+                tracing::error!("{}", err_msg);
+                Ok(CallToolResult::error(vec![Content::text(err_msg)]))
+            }
+        }
+    }
+
+    #[tool(
+        name = "create_case_observable",
+        description = "Creates an observable on an existing TheHive case. Returns the newly created observable information."
+    )]
+    async fn create_case_observable(
+        &self,
+        #[tool(aggr)] params: CreateCaseObservableParams,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(case_id = %params.case_id, data_type = %params.data_type, "Creating observable on TheHive case");
+
+        // Build observable input
+        let observable_input = RawObservableInput {
+            data_type: params.data_type,
+            data: params.data,
+            message: params.message,
+            tlp: params.tlp,
+            pap: params.pap,
+            ioc: params.ioc,
+            sighted: params.sighted,
+            sighted_at: None,
+            ignore_similarity: None,
+            tags: params.tags,
+        };
+
+        match self
+            .thehive_client
+            .create_observable(&params.case_id, observable_input)
+            .await
+        {
+            Ok(observable) => {
+                let obs_id = &observable.id;
+                let data_type = &observable.data_type;
+                let data = observable.data.as_deref().unwrap_or("N/A");
+                let ioc = if observable.ioc { "Yes" } else { "No" };
+                let tlp_label = &observable.tlp_label;
+
+                let formatted_text = format!(
+                    "Successfully created observable.\nObservable ID: {}\nType: {}\nValue: {}\nIOC: {}\nTLP: {}",
+                    obs_id, data_type, data, ioc, tlp_label
+                );
+
+                Ok(CallToolResult::success(vec![Content::text(formatted_text)]))
+            }
+            Err(e) => {
+                let err_msg = format!(
+                    "Error creating observable on case {}: {}",
+                    params.case_id, e
+                );
                 tracing::error!("{}", err_msg);
                 Ok(CallToolResult::error(vec![Content::text(err_msg)]))
             }
@@ -540,7 +581,9 @@ impl ServerHandler for TheHiveToolsServer {
                 - 'get_thehive_case_by_id': Retrieves a specific case by its ID.\n\
                 - 'promote_alert_to_case': Promotes an alert to a case.\n\
                 - 'create_thehive_case': Creates a new case in TheHive. Requires 'title' and 'description'. \
-                Optional parameters include 'severity', 'tags', 'tlp', 'pap', 'status', 'assignee', 'case_template', and 'start_date'."
+                Optional parameters include 'severity', 'tags', 'tlp', 'pap', 'status', 'assignee', 'case_template', and 'start_date'.\n\
+                - 'create_case_observable': Creates an observable on an existing case. Requires 'case_id', 'data_type', and 'data'. \
+                Optional parameters include 'message', 'tlp', 'pap', 'ioc', 'sighted', and 'tags'."
                     .to_string(),
             ),
         }
