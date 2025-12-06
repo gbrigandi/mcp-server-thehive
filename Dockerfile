@@ -1,5 +1,5 @@
 # Multi-stage build for TheHive MCP Server
-FROM rust:1.75-slim AS builder
+FROM rust:1.83-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,8 +16,8 @@ COPY Cargo.toml Cargo.lock ./
 # Copy source code
 COPY src/ ./src/
 
-# Build the application
-RUN cargo build --release
+# Build the application (only the main binary, skip test binaries)
+RUN cargo build --release --bin mcp-server-thehive
 
 # Runtime stage
 FROM debian:bookworm-slim
