@@ -11,6 +11,10 @@ This server acts as a bridge between MCP clients (like AI assistants) and TheHiv
 - Promote alerts to cases
 - Perform incident response operations
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/gbrigandi-mcp-server-thehive).
+
 ## Features
 
 ### Available Tools
